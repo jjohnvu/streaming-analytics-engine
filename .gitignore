@@ -1,0 +1,13 @@
+# Compiled binaries / build output
+/bin/
+*.exe
+*.out
+
+# Go test & coverage artifacts
+*.test
+coverage.out
+
+# Editor / OS cruft
+.DS_Store
+.idea/
+.vscode/
