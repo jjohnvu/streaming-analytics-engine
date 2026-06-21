@@ -89,7 +89,7 @@ Built so far:
 - [x] `Aggregator` interface + `SumAggregator`
 - [x] Load generator with all four knobs
 - [x] Tumbling window assigner (half-open, epoch-aligned)
-- [ ] Pipeline wiring (Source → … → Sink) printing per-(zone, window) aggregates
+- [x] Pipeline wiring (Source → … → Sink) printing per-(zone, window) aggregates
 - [ ] Throughput + p50/p99 latency benchmark
 - [ ] Watermarks, allowed lateness, side output (the milestone)
 - [ ] Sliding + session windows
@@ -99,19 +99,37 @@ Built so far:
 Standard library only — no third-party dependencies.
 
 ```sh
-go test ./...      # run all tests
-go vet ./...       # static checks
+go run ./cmd/engine    # run the live demo (synthetic stream → per-zone/window sums)
+go test ./...          # run all tests
+go vet ./...           # static checks
 ```
 
-A one-line run command for the live demo lands with the pipeline-wiring step.
+The demo accepts flags, e.g.:
+
+```sh
+go run ./cmd/engine -eps 5000 -late 0.1 -maxlate 3000 -jitter 250 -window 1000 -dur 3s
+```
+
+| Flag       | Meaning                          | Default |
+| ---------- | -------------------------------- | ------- |
+| `-eps`     | events per second                | 1000    |
+| `-late`    | fraction of events emitted late  | 0.05    |
+| `-maxlate` | max lateness (ms)                | 2000    |
+| `-jitter`  | out-of-order jitter (ms)         | 250     |
+| `-window`  | tumbling window size (ms)        | 1000    |
+| `-dur`     | how long to run                  | 3s      |
 
 ## Layout
 
 ```
+cmd/engine/
+  main.go         # CLI demo: wires the pipeline, prints aggregates
 engine/
   types.go        # Event, Watermark, Window, WindowState
   aggregator.go   # Aggregator interface + SumAggregator
   generator.go    # synthetic load generator (four knobs)
   assigner.go     # WindowAssigner interface + TumblingAssigner
+  aggregation.go  # stateful per-(key, window) fold + WindowResult
+  pipeline.go     # goroutine/channel wiring of the five stages
   *_test.go       # a test alongside each core mechanic
 ```
