@@ -88,7 +88,7 @@ Built so far:
       `WindowState`
 - [x] `Aggregator` interface + `SumAggregator`
 - [x] Load generator with all four knobs
-- [ ] Tumbling window assigner
+- [x] Tumbling window assigner (half-open, epoch-aligned)
 - [ ] Pipeline wiring (Source → … → Sink) printing per-(zone, window) aggregates
 - [ ] Throughput + p50/p99 latency benchmark
 - [ ] Watermarks, allowed lateness, side output (the milestone)
@@ -112,5 +112,6 @@ engine/
   types.go        # Event, Watermark, Window, WindowState
   aggregator.go   # Aggregator interface + SumAggregator
   generator.go    # synthetic load generator (four knobs)
+  assigner.go     # WindowAssigner interface + TumblingAssigner
   *_test.go       # a test alongside each core mechanic
 ```
