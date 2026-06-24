@@ -103,6 +103,39 @@ On an Apple M2 (single process, in-memory):
 (Per-event latency includes timer overhead, so the absolute figures are
 conservative.)
 
+## Watermarks & late data
+
+Watermarks travel **in-band** on the same channel as events (a sealed
+`StreamElement` interface — an element is either an `Event` or a `Watermark`).
+The watermark generator tracks the max event time seen and emits
+
+```
+watermark = maxEventTime - allowedLateness
+```
+
+When a watermark passes a window's end (`End <= watermark`), that window **fires
+once**, emits its result, and is **evicted** — which is also what bounds the
+state map's size. Until then the window stays open and keeps folding in
+out-of-order events: that hold-back *is* the allowed-lateness grace period.
+
+An event whose window has already closed is **late**. It is never silently
+dropped — it's routed to a **side output** (reported by the demo as "events too
+late"). The `-lateness` flag controls the hold-back:
+
+```sh
+go run ./cmd/engine -eps 3000 -late 0.15 -maxlate 3000 -lateness 500
+# => N windows closed, M events too late (side output)
+```
+
+The tradeoff: **larger `-lateness` → more late data tolerated, windows close
+later; smaller → windows close sooner, more data to the side output.** No free
+lunch.
+
+> Design note: here `allowedLateness` *is* the watermark hold-back, so each
+> window emits a single final result. Speculative early firing with re-emitted
+> *updated* results (the full Flink model) is intentionally deferred — see the
+> decision note in `CLAUDE.md`.
+
 ## Status
 
 Built so far:
@@ -114,8 +147,9 @@ Built so far:
 - [x] Tumbling window assigner (half-open, epoch-aligned)
 - [x] Pipeline wiring (Source → … → Sink) printing per-(zone, window) aggregates
 - [x] Throughput + p50/p99 latency benchmark
-- [ ] Watermarks, allowed lateness, side output (the milestone)
+- [x] Watermarks, allowed lateness, side output (tumbling)
 - [ ] Sliding + session windows
+- [ ] avg / min-max / count aggregators
 
 ## Build & test
 
@@ -140,6 +174,7 @@ go run ./cmd/engine -eps 5000 -late 0.1 -maxlate 3000 -jitter 250 -window 1000 -
 | `-maxlate` | max lateness (ms)                | 2000    |
 | `-jitter`  | out-of-order jitter (ms)         | 250     |
 | `-window`  | tumbling window size (ms)        | 1000    |
+| `-lateness`| watermark hold-back (ms)         | 500     |
 | `-dur`     | how long to run                  | 3s      |
 
 ## Layout
@@ -151,11 +186,13 @@ cmd/bench/
   main.go         # throughput + p50/p99 latency benchmark
 engine/
   types.go        # Event, Watermark, Window, WindowState
+  stream.go       # StreamElement: in-band events + watermarks
+  watermark.go    # WatermarkGenerator (max event time - allowed lateness)
   aggregator.go   # Aggregator interface + SumAggregator
   generator.go    # synthetic load generator (four knobs)
   assigner.go     # WindowAssigner interface + TumblingAssigner
-  aggregation.go  # stateful per-(key, window) fold + WindowResult
-  pipeline.go     # goroutine/channel wiring of the five stages
+  aggregation.go  # watermark-aware fold: close/evict windows, side output
+  pipeline.go     # goroutine/channel wiring; in-band watermarks + side output
   percentile.go   # nearest-rank percentile (used by the benchmark)
   *_test.go       # a test alongside each core mechanic
 ```

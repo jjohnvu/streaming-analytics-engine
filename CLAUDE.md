@@ -152,6 +152,25 @@ most important job.
   **larger watermark delay / allowed lateness → more correct, higher latency;
   smaller → faster, more data to side output. No free lunch.**
 
+### Decision: allowed lateness == watermark holdback (single fire per window)
+
+The spec above conflates two things real systems sometimes split. Decision taken
+during implementation:
+
+- **`allowedLateness` IS the watermark holdback.** `watermark = maxEventTime -
+  allowedLateness`, exactly as the formula says. A window therefore stays open —
+  and keeps folding in out-of-order/late events (the "grace period") — until the
+  watermark reaches its end. When it does, the window **fires exactly once** and
+  is evicted. Events for an already-closed window go to the **side output**.
+- This makes "within grace → update the window" true (late-but-still-open events
+  are folded), but a window emits a **single** final result, not a stream of
+  updated results.
+- **Deferred (not built):** early/speculative firing — emitting a provisional
+  result at window end and then re-emitting *updated* results for late events
+  within an additional, separate `allowedLateness` after the fire. That's the
+  Flink model that literally produces "updated results." If we want it, add a
+  second knob (watermark delay vs. post-fire lateness) and propose it here first.
+
 ## Scope discipline
 
 ### In scope now (MVP → hard milestone)
