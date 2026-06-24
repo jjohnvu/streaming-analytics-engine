@@ -38,7 +38,7 @@ func main() {
 	ag := engine.NewAggregation(engine.NewTumblingAssigner(*windowMs), newAgg)
 	start := time.Now()
 	for _, ev := range events {
-		ag.Add(ev)
+		ag.AddEvent(ev)
 	}
 	elapsed := time.Since(start)
 	eps := float64(*n) / elapsed.Seconds()
@@ -49,7 +49,7 @@ func main() {
 	lat := make([]time.Duration, *n)
 	for i, ev := range events {
 		t0 := time.Now()
-		ag2.Add(ev)
+		ag2.AddEvent(ev)
 		lat[i] = time.Since(t0)
 	}
 
