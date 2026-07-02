@@ -162,21 +162,27 @@ go test ./...          # run all tests
 go vet ./...           # static checks
 ```
 
-The demo accepts flags, e.g.:
+The demo accepts flags — pick any window type and aggregation:
 
 ```sh
-go run ./cmd/engine -eps 5000 -late 0.1 -maxlate 3000 -jitter 250 -window 1000 -dur 3s
+go run ./cmd/engine -eps 5000 -late 0.1 -window 1000 -dur 3s          # tumbling sum
+go run ./cmd/engine -windows sliding -window 1000 -slide 500 -agg max # sliding max
+go run ./cmd/engine -windows session -gap 300 -agg avg                # session avg
 ```
 
-| Flag       | Meaning                          | Default |
-| ---------- | -------------------------------- | ------- |
-| `-eps`     | events per second                | 1000    |
-| `-late`    | fraction of events emitted late  | 0.05    |
-| `-maxlate` | max lateness (ms)                | 2000    |
-| `-jitter`  | out-of-order jitter (ms)         | 250     |
-| `-window`  | tumbling window size (ms)        | 1000    |
-| `-lateness`| watermark hold-back (ms)         | 500     |
-| `-dur`     | how long to run                  | 3s      |
+| Flag        | Meaning                                  | Default    |
+| ----------- | ---------------------------------------- | ---------- |
+| `-eps`      | events per second                        | 1000       |
+| `-late`     | fraction of events emitted late          | 0.05       |
+| `-maxlate`  | max lateness (ms)                        | 2000       |
+| `-jitter`   | out-of-order jitter (ms)                 | 250        |
+| `-windows`  | window type: tumbling\|sliding\|session  | tumbling   |
+| `-window`   | window size (ms), tumbling/sliding       | 1000       |
+| `-slide`    | slide interval (ms), sliding             | 500        |
+| `-gap`      | session inactivity gap (ms)              | 2000       |
+| `-agg`      | aggregation: sum\|avg\|min\|max\|count   | sum        |
+| `-lateness` | watermark hold-back (ms)                 | 500        |
+| `-dur`      | how long to run                          | 3s         |
 
 ## Layout
 
