@@ -150,7 +150,7 @@ Built so far:
 - [x] Watermarks, allowed lateness, side output (tumbling)
 - [x] Sliding window assigner (overlapping, slide-aligned)
 - [ ] Session windows (gap timeout, merge on late events)
-- [ ] avg / min-max / count aggregators
+- [x] avg / min / max / count aggregators behind the `Aggregator` interface
 
 ## Build & test
 
@@ -189,7 +189,7 @@ engine/
   types.go        # Event, Watermark, Window, WindowState
   stream.go       # StreamElement: in-band events + watermarks
   watermark.go    # WatermarkGenerator (max event time - allowed lateness)
-  aggregator.go   # Aggregator interface + SumAggregator
+  aggregator.go   # Aggregator interface + sum/avg/min/max/count
   generator.go    # synthetic load generator (four knobs)
   assigner.go     # WindowAssigner interface + Tumbling/Sliding assigners
   aggregation.go  # watermark-aware fold: close/evict windows, side output
