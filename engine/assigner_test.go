@@ -103,6 +103,115 @@ func TestTumblingProperties(t *testing.T) {
 	}
 }
 
+// SlidingAssigner must satisfy WindowAssigner.
+var _ WindowAssigner = (*SlidingAssigner)(nil)
+
+// TestSlidingAssignExact pins events to their full set of overlapping windows,
+// in increasing start order.
+func TestSlidingAssignExact(t *testing.T) {
+	a := NewSlidingAssigner(1000, 500) // each event in 2 windows
+
+	cases := []struct {
+		eventTime int64
+		want      []Window
+	}{
+		{0, []Window{{-500, 500}, {0, 1000}}},
+		{499, []Window{{-500, 500}, {0, 1000}}},
+		{500, []Window{{0, 1000}, {500, 1500}}},
+		{999, []Window{{0, 1000}, {500, 1500}}},
+		{1000, []Window{{500, 1500}, {1000, 2000}}}, // boundary -> shifts forward
+		{-1, []Window{{-1000, 0}, {-500, 500}}},     // negative event time
+	}
+
+	for _, c := range cases {
+		got := a.Assign(c.eventTime)
+		if len(got) != len(c.want) {
+			t.Fatalf("Assign(%d) = %v, want %v", c.eventTime, got, c.want)
+		}
+		for i := range c.want {
+			if got[i] != c.want[i] {
+				t.Errorf("Assign(%d)[%d] = %+v, want %+v", c.eventTime, i, got[i], c.want[i])
+			}
+		}
+	}
+}
+
+// TestSlidingEqualsTumblingWhenSlideIsSize: slide == size degenerates to
+// tumbling — same single window for any event time.
+func TestSlidingEqualsTumblingWhenSlideIsSize(t *testing.T) {
+	s := NewSlidingAssigner(1000, 1000)
+	tu := NewTumblingAssigner(1000)
+	rng := rand.New(rand.NewSource(3))
+
+	for i := 0; i < 10000; i++ {
+		et := rng.Int63n(20_000_000) - 10_000_000
+		sw, tw := s.Assign(et), tu.Assign(et)
+		if len(sw) != 1 || sw[0] != tw[0] {
+			t.Fatalf("Assign(%d): sliding %v != tumbling %v", et, sw, tw)
+		}
+	}
+}
+
+// TestSlidingProperties: for slide dividing size, every event lands in exactly
+// size/slide windows; each contains the event, is slide-aligned, and is exactly
+// size wide; starts strictly increase by slide.
+func TestSlidingProperties(t *testing.T) {
+	const size, slide = 900, 300 // 3 windows per event
+	a := NewSlidingAssigner(size, slide)
+	rng := rand.New(rand.NewSource(11))
+
+	for i := 0; i < 100000; i++ {
+		et := rng.Int63n(20_000_000) - 10_000_000
+		ws := a.Assign(et)
+		if len(ws) != size/slide {
+			t.Fatalf("Assign(%d) returned %d windows, want %d", et, len(ws), size/slide)
+		}
+		for k, w := range ws {
+			if !w.Contains(et) {
+				t.Fatalf("window %+v does not contain %d", w, et)
+			}
+			if floorMod(w.Start, slide) != 0 {
+				t.Fatalf("window start %d not slide-aligned", w.Start)
+			}
+			if w.End-w.Start != size {
+				t.Fatalf("window width %d, want %d", w.End-w.Start, size)
+			}
+			if k > 0 && w.Start != ws[k-1].Start+slide {
+				t.Fatalf("starts not increasing by slide: %v", ws)
+			}
+		}
+	}
+}
+
+// TestSlidingGapWhenSlideExceedsSize: with slide > size, instants between
+// windows are covered by none — allowed, but they assign to zero windows.
+func TestSlidingGapWhenSlideExceedsSize(t *testing.T) {
+	a := NewSlidingAssigner(300, 1000) // windows [0,300), [1000,1300), ...
+
+	if got := a.Assign(100); len(got) != 1 || (got[0] != Window{0, 300}) {
+		t.Errorf("Assign(100) = %v, want [{0 300}]", got)
+	}
+	if got := a.Assign(500); len(got) != 0 {
+		t.Errorf("Assign(500) = %v, want none (gap)", got)
+	}
+}
+
+// TestNewSlidingAssignerPanics: non-positive size or slide is a programming
+// error.
+func TestNewSlidingAssignerPanics(t *testing.T) {
+	cases := []struct{ size, slide int64 }{{0, 500}, {-1, 500}, {1000, 0}, {1000, -5}}
+	for _, c := range cases {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("NewSlidingAssigner(%d, %d) did not panic", c.size, c.slide)
+				}
+			}()
+			NewSlidingAssigner(c.size, c.slide)
+		}()
+	}
+}
+
 // TestNewTumblingAssignerPanics: a non-positive size is a programming error.
 func TestNewTumblingAssignerPanics(t *testing.T) {
 	for _, size := range []int64{0, -1, -1000} {

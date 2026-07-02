@@ -148,7 +148,8 @@ Built so far:
 - [x] Pipeline wiring (Source → … → Sink) printing per-(zone, window) aggregates
 - [x] Throughput + p50/p99 latency benchmark
 - [x] Watermarks, allowed lateness, side output (tumbling)
-- [ ] Sliding + session windows
+- [x] Sliding window assigner (overlapping, slide-aligned)
+- [ ] Session windows (gap timeout, merge on late events)
 - [ ] avg / min-max / count aggregators
 
 ## Build & test
@@ -190,7 +191,7 @@ engine/
   watermark.go    # WatermarkGenerator (max event time - allowed lateness)
   aggregator.go   # Aggregator interface + SumAggregator
   generator.go    # synthetic load generator (four knobs)
-  assigner.go     # WindowAssigner interface + TumblingAssigner
+  assigner.go     # WindowAssigner interface + Tumbling/Sliding assigners
   aggregation.go  # watermark-aware fold: close/evict windows, side output
   pipeline.go     # goroutine/channel wiring; in-band watermarks + side output
   percentile.go   # nearest-rank percentile (used by the benchmark)
