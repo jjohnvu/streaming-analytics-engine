@@ -9,6 +9,16 @@ type PipelineResult struct {
 	Late    []Event
 }
 
+// Processor is the stateful stage the pipeline drives with the in-band stream:
+// Process consumes one element (event or watermark) and returns any windows the
+// element closed plus any events it revealed as late; Flush closes whatever
+// remains at end of stream. Fixed-window aggregation (Aggregation) and session
+// windows both implement it.
+type Processor interface {
+	Process(elem StreamElement) (closed []WindowResult, late []Event)
+	Flush() []WindowResult
+}
+
 // Pipeline wires the stages together with goroutines and channels:
 //
 //	Source (generator) → Ingestion (+ watermark gen) → Aggregator → Sink
@@ -22,13 +32,13 @@ type PipelineResult struct {
 type Pipeline struct {
 	gen   *Generator
 	wmgen *WatermarkGenerator
-	agg   *Aggregation
+	proc  Processor
 }
 
-// NewPipeline connects a load generator, a watermark generator, and an
-// aggregation stage.
-func NewPipeline(gen *Generator, wmgen *WatermarkGenerator, agg *Aggregation) *Pipeline {
-	return &Pipeline{gen: gen, wmgen: wmgen, agg: agg}
+// NewPipeline connects a load generator, a watermark generator, and a
+// processing stage (fixed-window or session aggregation).
+func NewPipeline(gen *Generator, wmgen *WatermarkGenerator, proc Processor) *Pipeline {
+	return &Pipeline{gen: gen, wmgen: wmgen, proc: proc}
 }
 
 // Run drives the pipeline until ctx is cancelled, then flushes any windows the
@@ -42,11 +52,11 @@ func (p *Pipeline) Run(ctx context.Context) PipelineResult {
 
 	var res PipelineResult
 	for elem := range stream {
-		closed, late := p.agg.Process(elem)
+		closed, late := p.proc.Process(elem)
 		res.Windows = append(res.Windows, closed...)
 		res.Late = append(res.Late, late...)
 	}
-	res.Windows = append(res.Windows, p.agg.Flush()...)
+	res.Windows = append(res.Windows, p.proc.Flush()...)
 	sortResults(res.Windows)
 	return res
 }

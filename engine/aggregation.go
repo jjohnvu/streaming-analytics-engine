@@ -39,6 +39,9 @@ type Aggregation struct {
 	hasWM     bool
 }
 
+// Aggregation implements Processor.
+var _ Processor = (*Aggregation)(nil)
+
 // NewAggregation builds an Aggregation over the given assigner. newAgg mints a
 // fresh aggregate for each new (key, window) cell.
 func NewAggregation(assigner WindowAssigner, newAgg func() Aggregator) *Aggregation {
