@@ -149,7 +149,7 @@ Built so far:
 - [x] Throughput + p50/p99 latency benchmark
 - [x] Watermarks, allowed lateness, side output (tumbling)
 - [x] Sliding window assigner (overlapping, slide-aligned)
-- [ ] Session windows (gap timeout, merge on late events)
+- [x] Session windows (gap timeout; late bridging events merge sessions)
 - [x] avg / min / max / count aggregators behind the `Aggregator` interface
 
 ## Build & test
@@ -193,6 +193,7 @@ engine/
   generator.go    # synthetic load generator (four knobs)
   assigner.go     # WindowAssigner interface + Tumbling/Sliding assigners
   aggregation.go  # watermark-aware fold: close/evict windows, side output
+  session.go      # session windows: gap timeout, merge-on-bridge via Merge
   pipeline.go     # goroutine/channel wiring; in-band watermarks + side output
   percentile.go   # nearest-rank percentile (used by the benchmark)
   *_test.go       # a test alongside each core mechanic

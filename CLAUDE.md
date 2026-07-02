@@ -137,6 +137,25 @@ most important job.
    can **merge** two previously-separate sessions (this is where `Merge` earns
    its keep).
 
+### Decisions: window/merge semantics (taken during implementation)
+
+- **Sliding allows `slide > size`** (sampling windows): instants in the gaps
+  assign to zero windows. Property "every event in ≥1 window" holds only for
+  `slide <= size`; the assigner doesn't forbid the rest.
+- **Session merging is strict-overlap, half-open.** An event's proto-window is
+  `[t, t+gap)`; it merges with a session only on *strict* overlap. Touching
+  (event exactly at a session's `End`) starts a NEW session — an inactivity gap
+  of exactly `gap` closes a session, consistent with `[Start, End)` everywhere.
+- **Session lateness rule:** an event is late only if its proto-window overlaps
+  no open session AND `t+gap <= watermark` (nothing it could join can still
+  exist). If it overlaps an open session it folds in even when `t < watermark` —
+  same grace-by-holdback semantics as fixed windows.
+- **`Aggregator.Merge` is same-kind only.** Avg must merge sum+count (merging
+  through `Result()` would average averages); min/max carry a seen flag so empty
+  merges are no-ops. Mixed-kind merges panic — fail loudly over silent
+  corruption. (`SumAggregator` still merges via `Result()`, which is exact for
+  sums.)
+
 ## Watermark mechanics (the heart — spend depth here)
 
 - Watermark generator tracks max event-time seen, emits
